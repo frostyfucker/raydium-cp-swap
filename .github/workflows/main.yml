@@ -1,3 +1,8 @@
+# Automated Raydium CP-Swap Overflow Test
+# This workflow checks out your repository, sets up the necessary Solana
+# and Rust toolchains, starts a local test validator, and runs your
+# overflow test.
+
 name: Automated Raydium CP-Swap Overflow Test
 
 on:
@@ -9,6 +14,7 @@ on:
 
 jobs:
   test:
+    # This job will run on your self-hosted runner.
     runs-on: self-hosted
 
     steps:
@@ -23,30 +29,56 @@ jobs:
 
     - name: Install Solana CLI
       run: |
+        # Download and install the Solana CLI.
         sh -c "$(curl -sSfL https://release.solana.com/v1.18.2/install)"
+        # Add the Solana bin directory to the PATH for subsequent steps.
         echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
     - name: Install BPF Toolchain
       run: |
+        # Add the Rust source component required for BPF development.
         rustup component add rust-src
+        # Install the cargo-build-bpf tool.
         cargo install --git https://github.com/solana-labs/cargo-build-bpf.git cargo-build-bpf
 
-    - name: Start Solana Test Validator
+    - name: Start Solana Test Validator and Wait for Readiness
       run: |
+        # Start the validator in the background. The --reset flag clears previous data.
         solana-test-validator --reset &
-        sleep 15
+        
+        # Poll the validator's health endpoint until it responds. This is more
+        # reliable than a hard-coded sleep time.
+        for i in `seq 1 10`; do
+          solana ping > /dev/null 2>&1
+          if [ $? -eq 0 ]; then
+            echo "Solana test validator is ready."
+            exit 0
+          fi
+          echo "Waiting for validator... $i"
+          sleep 5
+        done
+        
+        echo "Solana test validator failed to start."
+        exit 1
 
     - name: Build Raydium CP-Swap Program
       run: |
+        # Build the Solana BPF program.
         cargo build-bpf --manifest-path=program/Cargo.toml
 
     - name: Deploy Program to Local Validator
       run: |
+        # Find the compiled program file.
         PROGRAM_SO=$(find target/deploy -name '*.so' | head -n 1)
+        # Deploy the program to the local validator and capture its Program ID.
         PROGRAM_ID=$(solana program deploy $PROGRAM_SO | grep 'Program Id:' | awk '{print $3}')
+        # Export the Program ID as an environment variable for the next step.
         echo "PROGRAM_ID=$PROGRAM_ID" >> $GITHUB_ENV
 
     - name: Run Overflow Test
       env:
+        # Pass the newly deployed Program ID to the test script.
         RAYDIUM_CP_SWAP_PROGRAM_ID: ${{ env.PROGRAM_ID }}
-      run: cargo test --test overflow_test
+      run: |
+        # Run your specified test.
+        cargo test --test overflow_test
