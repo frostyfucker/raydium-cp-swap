@@ -38,6 +38,8 @@ jobs:
     - name: Install Solana CLI
       shell: powershell
       run: |
+        # Set the security protocol to TLS 1.2 to avoid connection errors.
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         # Install the Solana CLI using PowerShell.
         Invoke-WebRequest -Uri "https://release.solana.com/v1.18.2/solana-install-init-x86_64-pc-windows-msvc.exe" -OutFile "solana-install-init.exe"
         .\solana-install-init.exe --noninteractive
