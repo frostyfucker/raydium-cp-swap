@@ -40,8 +40,11 @@ jobs:
       run: |
         # Add the Rust source component required for BPF development.
         rustup component add rust-src
-        # Install the cargo-build-bpf tool from its Git repository.
-        cargo install --git https://github.com/solana-labs/cargo-build-bpf.git cargo-build-bpf
+        # Manually clone the repository to avoid the authentication error
+        # with cargo and then install the tool from the local path.
+        git clone https://github.com/solana-labs/cargo-build-bpf.git
+        cd cargo-build-bpf
+        cargo install --path .
 
     - name: Start Solana Test Validator and Wait for Readiness
       run: |
