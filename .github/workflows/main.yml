@@ -33,8 +33,8 @@ jobs:
       run: |
         # Install necessary dependencies to ensure a successful `curl` and `git` operation.
         sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
-        # Download and install the Solana CLI.
-        sh -c "$(curl -sSfL https://release.solana.com/v1.18.2/install)"
+        # Download and install the Solana CLI. The --retry flag makes it more resilient to network issues.
+        sh -c "$(curl -sSfL --retry 5 https://release.solana.com/v1.18.2/install)"
         # Add the Solana bin directory to the PATH for subsequent steps.
         echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
@@ -42,10 +42,11 @@ jobs:
       run: |
         # Add the Rust source component required for BPF development.
         rustup component add rust-src
-        # Download and extract the BPF toolchain to a temporary directory.
-        # This link provides a raw tarball that `tar` can handle.
+        # Download the BPF toolchain to a file first. The --retry flag helps with flaky connections.
+        curl -sSfL --retry 5 -o cargo-build-bpf.tar.gz https://github.com/solana-labs/cargo-build-bpf/tarball/v1.18.2
+        # Extract the toolchain from the downloaded file.
         mkdir -p /tmp/cargo-build-bpf
-        curl -L https://github.com/solana-labs/cargo-build-bpf/tarball/v1.18.2 | tar -xzf - --strip-components=1 -C /tmp/cargo-build-bpf
+        tar -xzf cargo-build-bpf.tar.gz --strip-components=1 -C /tmp/cargo-build-bpf
         # Install the tool from the local path.
         cargo install --path /tmp/cargo-build-bpf
 
