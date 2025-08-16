@@ -1,0 +1,52 @@
+name: Automated Raydium CP-Swap Overflow Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Install Solana CLI
+      run: |
+        sh -c "$(curl -sSfL https://release.solana.com/v1.18.2/install)"
+        echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+    - name: Install BPF Toolchain
+      run: |
+        rustup component add rust-src
+        cargo install --git https://github.com/solana-labs/cargo-build-bpf.git cargo-build-bpf
+
+    - name: Start Solana Test Validator
+      run: |
+        solana-test-validator --reset &
+        sleep 15
+
+    - name: Build Raydium CP-Swap Program
+      run: |
+        cargo build-bpf --manifest-path=program/Cargo.toml
+
+    - name: Deploy Program to Local Validator
+      run: |
+        PROGRAM_SO=$(find target/deploy -name '*.so' | head -n 1)
+        PROGRAM_ID=$(solana program deploy $PROGRAM_SO | grep 'Program Id:' | awk '{print $3}')
+        echo "PROGRAM_ID=$PROGRAM_ID" >> $GITHUB_ENV
+
+    - name: Run Overflow Test
+      env:
+        RAYDIUM_CP_SWAP_PROGRAM_ID: ${{ env.PROGRAM_ID }}
+      run: cargo test --test overflow_test
+
