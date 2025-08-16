@@ -29,8 +29,10 @@ jobs:
         toolchain: stable
         override: true
 
-    - name: Install Solana CLI
+    - name: Install Solana CLI and Dependencies
       run: |
+        # Install necessary dependencies to ensure a successful `curl` and `git` operation.
+        sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
         # Download and install the Solana CLI.
         sh -c "$(curl -sSfL https://release.solana.com/v1.18.2/install)"
         # Add the Solana bin directory to the PATH for subsequent steps.
@@ -40,10 +42,12 @@ jobs:
       run: |
         # Add the Rust source component required for BPF development.
         rustup component add rust-src
-        # Manually clone the repository to avoid authentication errors.
-        git clone https://github.com/solana-labs/cargo-build-bpf.git
-        cd cargo-build-bpf
-        cargo install --path .
+        # Download and extract the BPF toolchain to a temporary directory
+        # to avoid the `git clone` authentication error.
+        mkdir -p /tmp/cargo-build-bpf
+        curl -L https://github.com/solana-labs/cargo-build-bpf/archive/refs/tags/v1.18.2.tar.gz | tar -xzf - --strip-components=1 -C /tmp/cargo-build-bpf
+        # Install the tool from the local path.
+        cargo install --path /tmp/cargo-build-bpf
 
     - name: Start Solana Test Validator and Wait for Readiness
       run: |
