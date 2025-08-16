@@ -1,7 +1,6 @@
-# Automated Raydium CP-Swap Overflow Test
-# This workflow is configured to run on a standard GitHub-hosted
-# Ubuntu runner. It automates the setup, deployment, and testing
-# of your Solana program.
+# Automated Raydium CP-Swap Overflow Test for Windows
+# This workflow is configured to run on a self-hosted Windows runner.
+# It automates the setup, deployment, and testing of your Solana program.
 
 name: Automated Raydium CP-Swap Overflow Test
 
@@ -14,76 +13,92 @@ on:
 
 jobs:
   test:
-    # This job will run on a fresh Ubuntu virtual machine provided by GitHub.
-    runs-on: ubuntu-latest
+    # This job will run on your self-hosted Windows runner.
+    runs-on: self-hosted
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    # Use the actions-rs/toolchain to install Rust, which is the
-    # standard and most reliable method for Linux-based runners.
-    - name: Install Rust Toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-
-    - name: Install Solana CLI
+    # Manually install Rust using the official Windows installer.
+    - name: Install Rust
+      shell: powershell
       run: |
-        # Download and install the Solana CLI.
-        sh -c "$(curl -sSfL https://release.solana.com/v1.18.2/install)"
-        # Add the Solana bin directory to the PATH for subsequent steps.
-        echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+        # Use the official URL for the Rustup Windows installer.
+        Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "rustup-init.exe"
+        .\rustup-init.exe -y --default-toolchain stable --profile minimal
+        
+    - name: Add Rust to PATH
+      shell: powershell
+      run: |
+        # Add the cargo bin directory to the PATH for subsequent steps.
+        echo "::add-path::$HOME\.cargo\bin"
+        
+    - name: Install Solana CLI
+      shell: powershell
+      run: |
+        # Install the Solana CLI using PowerShell.
+        Invoke-WebRequest -Uri "https://release.solana.com/v1.18.2/solana-install-init-x86_64-pc-windows-msvc.exe" -OutFile "solana-install-init.exe"
+        .\solana-install-init.exe --noninteractive
+        # Add the Solana bin directory to the PATH.
+        echo "::add-path::$HOME\AppData\Local\solana\install\active_release\bin"
 
     - name: Install BPF Toolchain
+      shell: bash
       run: |
         # Add the Rust source component required for BPF development.
         rustup component add rust-src
-        # Manually clone the repository to avoid the authentication error
-        # with cargo and then install the tool from the local path.
+        # Manually clone the repository to avoid authentication errors.
         git clone https://github.com/solana-labs/cargo-build-bpf.git
         cd cargo-build-bpf
         cargo install --path .
 
     - name: Start Solana Test Validator and Wait for Readiness
+      shell: powershell
       run: |
         # Start the validator in the background. The --reset flag clears previous data.
-        solana-test-validator --reset &
+        Start-Process -FilePath "solana-test-validator" -ArgumentList "--reset" -NoNewWindow
         
-        # Poll the validator's health endpoint until it responds. This is more
-        # reliable than a hard-coded sleep time.
-        for i in `seq 1 10`; do
-          solana ping > /dev/null 2>&1
-          if [ $? -eq 0 ]; then
-            echo "Solana test validator is ready."
-            exit 0
-          fi
+        # Poll the validator's health endpoint until it responds.
+        for ($i = 1; $i -le 10; $i++) {
+          try {
+            solana ping -v 2>$null | Out-Null
+            if ($LastExitCode -eq 0) {
+              echo "Solana test validator is ready."
+              exit 0
+            }
+          } catch {
+            # Ignore errors and continue polling.
+          }
           echo "Waiting for validator... $i"
-          sleep 5
-        done
+          Start-Sleep -Seconds 5
+        }
         
         echo "Solana test validator failed to start."
         exit 1
 
     - name: Build Raydium CP-Swap Program
+      shell: bash
       run: |
         # Build the Solana BPF program.
         cargo build-bpf --manifest-path=program/Cargo.toml
 
     - name: Deploy Program to Local Validator
+      shell: powershell
       run: |
         # Find the compiled program file.
-        PROGRAM_SO=$(find target/deploy -name '*.so' | head -n 1)
+        $PROGRAM_SO = (Get-ChildItem -Path target\deploy -Filter *.so | Select-Object -First 1).FullName
         # Deploy the program to the local validator and capture its Program ID.
-        PROGRAM_ID=$(solana program deploy $PROGRAM_SO | grep 'Program Id:' | awk '{print $3}')
+        $PROGRAM_OUTPUT = solana program deploy $PROGRAM_SO
+        $PROGRAM_ID = ($PROGRAM_OUTPUT | Select-String -Pattern "Program Id:").ToString().Split(" ")[-1]
         # Export the Program ID as an environment variable for the next step.
-        echo "PROGRAM_ID=$PROGRAM_ID" >> $GITHUB_ENV
+        echo "PROGRAM_ID=$PROGRAM_ID" >> $env:GITHUB_ENV
 
     - name: Run Overflow Test
       env:
         # Pass the newly deployed Program ID to the test script.
         RAYDIUM_CP_SWAP_PROGRAM_ID: ${{ env.PROGRAM_ID }}
+      shell: bash
       run: |
         # Run your specified test.
         cargo test --test overflow_test
