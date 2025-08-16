@@ -42,10 +42,10 @@ jobs:
       run: |
         # Add the Rust source component required for BPF development.
         rustup component add rust-src
-        # Download and extract the BPF toolchain to a temporary directory
-        # to avoid the `git clone` authentication error.
+        # Download and extract the BPF toolchain to a temporary directory.
+        # This link provides a raw tarball that `tar` can handle.
         mkdir -p /tmp/cargo-build-bpf
-        curl -L https://github.com/solana-labs/cargo-build-bpf/archive/refs/tags/v1.18.2.tar.gz | tar -xzf - --strip-components=1 -C /tmp/cargo-build-bpf
+        curl -L https://github.com/solana-labs/cargo-build-bpf/tarball/v1.18.2 | tar -xzf - --strip-components=1 -C /tmp/cargo-build-bpf
         # Install the tool from the local path.
         cargo install --path /tmp/cargo-build-bpf
 
