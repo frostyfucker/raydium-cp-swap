@@ -31,8 +31,9 @@ jobs:
     - name: Add Rust to PATH
       shell: powershell
       run: |
-        # Add the cargo bin directory to the PATH for subsequent steps.
-        echo "::add-path::$HOME\.cargo\bin"
+        # Add the cargo bin directory to the PATH using the new GitHub Actions method.
+        # This writes the path to the GITHUB_PATH environment file.
+        echo "$HOME\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         
     - name: Install Solana CLI
       shell: powershell
@@ -40,8 +41,8 @@ jobs:
         # Install the Solana CLI using PowerShell.
         Invoke-WebRequest -Uri "https://release.solana.com/v1.18.2/solana-install-init-x86_64-pc-windows-msvc.exe" -OutFile "solana-install-init.exe"
         .\solana-install-init.exe --noninteractive
-        # Add the Solana bin directory to the PATH.
-        echo "::add-path::$HOME\AppData\Local\solana\install\active_release\bin"
+        # Add the Solana bin directory to the PATH using the new GitHub Actions method.
+        echo "$HOME\AppData\Local\solana\install\active_release\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: Install BPF Toolchain
       shell: bash
