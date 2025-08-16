@@ -1,7 +1,7 @@
 # Automated Raydium CP-Swap Overflow Test
-# This workflow checks out your repository, sets up the necessary Solana
-# and Rust toolchains, starts a local test validator, and runs your
-# overflow test.
+# This workflow is configured to run on a standard GitHub-hosted
+# Ubuntu runner. It automates the setup, deployment, and testing
+# of your Solana program.
 
 name: Automated Raydium CP-Swap Overflow Test
 
@@ -14,25 +14,21 @@ on:
 
 jobs:
   test:
-    # This job will run on your self-hosted runner.
-    runs-on: self-hosted
+    # This job will run on a fresh Ubuntu virtual machine provided by GitHub.
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    # Manually install Rust, as the actions-rs/toolchain has
-    # known compatibility issues with self-hosted Windows runners.
-    - name: Install Rust
-      run: |
-        curl https://win.rustup.rs/rustup-init.exe -o rustup-init.exe
-        .\rustup-init.exe -y --default-toolchain stable --profile minimal
-        
-    # Add the cargo bin directory to the PATH for subsequent steps.
-    - name: Add Rust to PATH
-      run: |
-        echo "::add-path::$HOME/.cargo/bin"
-        
+    # Use the actions-rs/toolchain to install Rust, which is the
+    # standard and most reliable method for Linux-based runners.
+    - name: Install Rust Toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
     - name: Install Solana CLI
       run: |
         # Download and install the Solana CLI.
@@ -44,7 +40,7 @@ jobs:
       run: |
         # Add the Rust source component required for BPF development.
         rustup component add rust-src
-        # Install the cargo-build-bpf tool.
+        # Install the cargo-build-bpf tool from its Git repository.
         cargo install --git https://github.com/solana-labs/cargo-build-bpf.git cargo-build-bpf
 
     - name: Start Solana Test Validator and Wait for Readiness
