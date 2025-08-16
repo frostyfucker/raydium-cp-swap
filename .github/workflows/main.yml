@@ -21,12 +21,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    # Manually install Rust, as the actions-rs/toolchain has
+    # known compatibility issues with self-hosted Windows runners.
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-
+      run: |
+        curl https://win.rustup.rs/rustup-init.exe -o rustup-init.exe
+        .\rustup-init.exe -y --default-toolchain stable --profile minimal
+        
+    # Add the cargo bin directory to the PATH for subsequent steps.
+    - name: Add Rust to PATH
+      run: |
+        echo "::add-path::$HOME/.cargo/bin"
+        
     - name: Install Solana CLI
       run: |
         # Download and install the Solana CLI.
